@@ -1,0 +1,113 @@
+
+DELIMITER $$
+-- 通过时间戳创建建立分区的存储过程
+create PROCEDURE create_partition(IN tablename varchar(20),IN tablecolname varchar(20),IN dayno int(3))
+COMMENT '每7天创建一次表分区，由定时任务调用'
+BEGIN
+    DECLARE p_id INT;
+    DECLARE lastTime LONG;
+    DECLARE curTime LONG;
+    DECLARE endTime LONG;
+    SELECT UNIX_TIMESTAMP(CAST(SYSDATE()AS DATE)) + dayno * 24 * 3600 INTO endTime;
+    SELECT COUNT(partition_name) into p_id FROM INFORMATION_SCHEMA.partitions WHERE TABLE_SCHEMA = SCHEMA() AND TABLE_NAME=tablename;
+    if p_id = 0 then
+        SELECT UNIX_TIMESTAMP(CAST(SYSDATE()AS DATE)) into curTime;
+        set @v_add = CONCAT('ALTER table ',tablename,' PARTITION by range(',tablecolname,') (partition ',CONCAT('SYS_',curTime),' values less than (',curTime + 30 * 60,'))');
+        PREPARE stmt from @v_add;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    end if;
+
+    SELECT max(partition_description) des into curTime from INFORMATION_SCHEMA.partitions WHERE TABLE_SCHEMA = SCHEMA() AND TABLE_NAME=tablename;
+    while curTime < endTime do
+        set curTime = curTime + 30 * 60;
+        set @v_add = CONCAT('alter table ',tablename,' add partition (partition ',CONCAT('SYS_',curTime),' values less than (',curTime + 30 * 60,'))');
+        PREPARE stmt from @v_add;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    end while;
+END;
+-- 通过时间戳创建删除分区的存储过程
+create PROCEDURE delete_partition(IN tablename varchar(20),IN tablecolname varchar(20),IN dayno int(3))
+COMMENT '每月按时添加表分区的存储过程，由定时任务调用'
+BEGIN
+    DECLARE p_id INT;
+    DECLARE curTime LONG;
+    DECLARE minTime LONG;
+    DECLARE curPart VARCHAR(50);
+    SELECT UNIX_TIMESTAMP(CAST(SYSDATE()AS DATE)) - dayno * 24 * 3600 INTO minTime;
+    SELECT COUNT(partition_name) into p_id FROM INFORMATION_SCHEMA.partitions WHERE TABLE_SCHEMA = SCHEMA() AND TABLE_NAME=tablename;
+    if p_id > 0 then
+        SELECT min(partition_description) des into curTime from INFORMATION_SCHEMA.partitions WHERE TABLE_SCHEMA = SCHEMA() AND TABLE_NAME=tablename;
+        while curTime < minTime do
+            SELECT PARTITION_NAME into curPart from INFORMATION_SCHEMA.partitions WHERE TABLE_SCHEMA = SCHEMA() AND TABLE_NAME=tablename and partition_description = curTime;
+            set @v_add = CONCAT('alter table ',tablename,' drop partition ',curPart);
+            PREPARE stmt from @v_add;   --准备sql语句
+            EXECUTE stmt;               --执行sql
+            DEALLOCATE PREPARE stmt;    --释放sql
+            SELECT min(partition_description) des into curTime from INFORMATION_SCHEMA.partitions WHERE TABLE_SCHEMA = SCHEMA() AND TABLE_NAME=tablename;
+        end while;
+    END IF;
+END;
+$$
+DELIMITER ;
+-- 创建建立分区的定时任务--表 history
+create event add_history_pt_event on SCHEDULE EVERY 7 DAY starts date_add(date_add(curdate(),interval 7 day), interval 0 hour)
+on COMPLETION PRESERVE
+do call create_partition('history','clock',7);
+
+-- 创建删除分区的定时任务 -- 表 history
+create event del_history_pt_event on SCHEDULE EVERY 1 DAY starts date_add(date_add(curdate(),interval 1 day), interval 0 hour)
+on COMPLETION PRESERVE
+do call delete_partition('history','clock',7);
+-- -------------------------------------------------------------------------------
+-- 创建建立分区的定时任务--表 history_uint
+create event add_history_ui_pt_event on SCHEDULE EVERY 7 DAY STARTS date_add(date_add(curdate(),interval 7 day), interval 0 hour)
+on COMPLETION PRESERVE
+do call create_partition('history_uint','clock',7);
+
+-- 创建删除分区的定时任务 -- 表 history_uint
+create event del_history_ui_pt_event on SCHEDULE EVERY 1 DAY STARTS date_add(date_add(curdate(),interval 1 day), interval 0 hour)
+on COMPLETION PRESERVE
+do call delete_partition('history_uint','clock',7);
+-- -------------------------------------------------------------------------------
+-- 创建建立分区的定时任务--表 history_text
+create event add_history_tx_pt_event on SCHEDULE EVERY 7 DAY STARTS date_add(date_add(curdate(),interval 7 day), interval 0 hour)
+on COMPLETION PRESERVE
+do call create_partition('history_text','clock',7);
+
+-- 创建删除分区的定时任务 -- 表 history_text
+create event del_history_tx_pt_event on SCHEDULE EVERY 1 DAY STARTS date_add(date_add(curdate(),interval 1 day), interval 0 hour)
+on COMPLETION PRESERVE
+do call delete_partition('history_text','clock',7);
+-- -------------------------------------------------------------------------------
+-- 创建建立分区的定时任务--表 history_str
+create event add_history_str_pt_event on SCHEDULE EVERY 7 DAY STARTS date_add(date_add(curdate(),interval 7 day), interval 0 hour)
+on COMPLETION PRESERVE
+do call create_partition('history_str','clock',7);
+
+-- 创建删除分区的定时任务 -- 表 history_str
+create event del_history_str_pt_event on SCHEDULE EVERY 1 DAY STARTS date_add(date_add(curdate(),interval 1 day), interval 0 hour)
+on COMPLETION PRESERVE
+do call delete_partition('history_str','clock',7);
+-- -------------------------------------------------------------------------------
+-- 创建建立分区的定时任务--表 trends_uint
+create event add_trends_ui_pt_event on SCHEDULE EVERY 7 DAY STARTS date_add(date_add(curdate(),interval 7 day), interval 0 hour)
+on COMPLETION PRESERVE
+do call create_partition('trends_uint','clock',7);
+
+-- 创建删除分区的定时任务 -- 表 trends_uint
+create event del_trends_ui_pt_event on SCHEDULE EVERY 1 DAY STARTS date_add(date_add(curdate(),interval 1 day), interval 0 hour)
+on COMPLETION PRESERVE
+do call delete_partition('trends_uint','clock',7);
+-- -------------------------------------------------------------------------------
+-- 创建建立分区的定时任务--表 trends
+create event add_trends_pt_event on SCHEDULE EVERY 7 DAY STARTS date_add(date_add(curdate(),interval 7 day), interval 0 hour)
+on COMPLETION PRESERVE
+do call create_partition('trends','clock',7);
+
+-- 创建删除分区的定时任务 -- 表 trends
+create event del_trends_pt_event on SCHEDULE EVERY 1 DAY STARTS date_add(date_add(curdate(),interval 1 day), interval 0 hour)
+on COMPLETION PRESERVE
+do call delete_partition('trends','clock',7);
+-- -------------------------------------------------------------------------------
