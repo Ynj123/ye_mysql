@@ -1,0 +1,52 @@
+//根据0000.00.00年开始计算秒数
+BEGIN
+    DECLARE p_id INT;
+    DECLARE lastTime LONG;
+    DECLARE curTime LONG;
+    DECLARE endTime LONG;
+    SELECT to_seconds(CAST(SYSDATE()AS DATE)) + dayno * 24 * 3600 INTO endTime;
+    SELECT COUNT(partition_name) into p_id FROM INFORMATION_SCHEMA.partitions WHERE TABLE_SCHEMA = SCHEMA() AND TABLE_NAME=tablename;
+    if p_id = 0 then
+        SELECT to_seconds(CAST(SYSDATE()AS DATE)) into curTime;
+        set @v_add = CONCAT('ALTER table ',tablename,' PARTITION by range(to_seconds(',tablecolname,')) (partition ',CONCAT('SYS_',curTime),' values less than (',curTime + 30 * 60,'))');
+        PREPARE stmt from @v_add;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    end if;
+
+    SELECT max(partition_description) des into curTime from INFORMATION_SCHEMA.partitions WHERE TABLE_SCHEMA = SCHEMA() AND TABLE_NAME=tablename;
+    while curTime < endTime do
+        set curTime = curTime + 30 * 60;
+        set @v_add = CONCAT('alter table ',tablename,' add partition (partition ',CONCAT('SYS_',curTime),' values less than (',curTime + 30 * 60,'))');
+        PREPARE stmt from @v_add;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    end while;
+END
+
+
+//根据unix时间戳1971.01.01年开始计算秒数
+BEGIN
+	  DECLARE p_id INT;
+    DECLARE lastTime LONG;
+    DECLARE curTime LONG;
+    DECLARE endTime LONG;
+    SELECT UNIX_TIMESTAMP(CAST(SYSDATE()AS DATE)) + dayno * 24 * 3600 INTO endTime;
+    SELECT COUNT(partition_name) into p_id FROM INFORMATION_SCHEMA.partitions WHERE TABLE_SCHEMA = SCHEMA() AND TABLE_NAME=tablename;
+    if p_id = 0 then
+        SELECT UNIX_TIMESTAMP(CAST(SYSDATE()AS DATE)) into curTime;
+        set @v_add = CONCAT('ALTER table ',tablename,' PARTITION by range(',tablecolname,') (partition ',CONCAT('SYS_',curTime),' values less than (',curTime + 30 * 60,'))');
+        PREPARE stmt from @v_add;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    end if;
+
+    SELECT max(partition_description) des into curTime from INFORMATION_SCHEMA.partitions WHERE TABLE_SCHEMA = SCHEMA() AND TABLE_NAME=tablename;
+    while curTime < endTime do
+        set curTime = curTime + 30 * 60;
+        set @v_add = CONCAT('alter table ',tablename,' add partition (partition ',CONCAT('SYS_',curTime),' values less than (',curTime + 30 * 60,'))');
+        PREPARE stmt from @v_add;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    end while;
+END
