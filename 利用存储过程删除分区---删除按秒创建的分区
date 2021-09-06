@@ -1,0 +1,42 @@
+//删除根据0000.00.00年创建的分区
+BEGIN
+    DECLARE p_id INT;
+    DECLARE curTime LONG;
+    DECLARE minTime LONG;
+    DECLARE curPart VARCHAR(50);
+    SELECT to_seconds(CAST(SYSDATE()AS DATE)) - dayno * 24 * 3600 INTO minTime;
+    SELECT COUNT(partition_name) into p_id FROM INFORMATION_SCHEMA.partitions WHERE TABLE_SCHEMA = SCHEMA() AND TABLE_NAME=tablename;
+    if p_id > 0 then
+        SELECT min(partition_description) des into curTime from INFORMATION_SCHEMA.partitions WHERE TABLE_SCHEMA = SCHEMA() AND TABLE_NAME=tablename;
+        while curTime < minTime do
+            SELECT PARTITION_NAME into curPart from INFORMATION_SCHEMA.partitions WHERE TABLE_SCHEMA = SCHEMA() AND TABLE_NAME=tablename and partition_description = curTime;
+            set @v_add = CONCAT('alter table ',tablename,' drop partition ',curPart);
+            PREPARE stmt from @v_add;
+            EXECUTE stmt;
+            DEALLOCATE PREPARE stmt;
+            SELECT min(partition_description) des into curTime from INFORMATION_SCHEMA.partitions WHERE TABLE_SCHEMA = SCHEMA() AND TABLE_NAME=tablename;
+        end while;
+    END IF;
+END
+
+
+//删除根据1971.01.01年创建的分区
+BEGIN
+	  DECLARE p_id INT;
+    DECLARE curTime LONG;
+    DECLARE minTime LONG;
+    DECLARE curPart VARCHAR(50);
+    SELECT UNIX_TIMESTAMP(CAST(SYSDATE()AS DATE)) - dayno * 24 * 3600 INTO minTime;
+    SELECT COUNT(partition_name) into p_id FROM INFORMATION_SCHEMA.partitions WHERE TABLE_SCHEMA = SCHEMA() AND TABLE_NAME=tablename;
+    if p_id > 0 then
+        SELECT min(partition_description) des into curTime from INFORMATION_SCHEMA.partitions WHERE TABLE_SCHEMA = SCHEMA() AND TABLE_NAME=tablename;
+        while curTime < minTime do
+            SELECT PARTITION_NAME into curPart from INFORMATION_SCHEMA.partitions WHERE TABLE_SCHEMA = SCHEMA() AND TABLE_NAME=tablename and partition_description = curTime;
+            set @v_add = CONCAT('alter table ',tablename,' drop partition ',curPart);
+            PREPARE stmt from @v_add;
+            EXECUTE stmt;
+            DEALLOCATE PREPARE stmt;
+            SELECT min(partition_description) des into curTime from INFORMATION_SCHEMA.partitions WHERE TABLE_SCHEMA = SCHEMA() AND TABLE_NAME=tablename;
+        end while;
+    END IF;
+END
